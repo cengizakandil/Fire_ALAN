@@ -1,4 +1,3 @@
-Getting Started
 This repository contains the code for analysis and the accompanying figures in the manscuript of Fire-ALAN in the Arctic. 
 Data
 The consistent and corrected nighttime light (CCNL) dataset is based on DMSP and available as GeoTIFF format at https://zenodo.org/record/6644980
