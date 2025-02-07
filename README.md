@@ -2,12 +2,12 @@ This repository contains the code for analysis and the accompanying figures in t
 
 ### Data
 
-The consistent and corrected nighttime light (CCNL) dataset is based on DMSP and available as GeoTIFF format at https://zenodo.org/record/6644980
-We used already cropped versions of annual ALAN data from https://github.com/PlekhanovaElena/ALAN_Arctic
-Terra climate data of precipitation and VPD is available at Catalog http://thredds.northwestknowledge.net:8080/thredds/catalog/TERRACLIMATE_ALL/data/catalog.html
-Land Surface Temperature data of MODIS 11C3 can be downloaded from https://ladsweb.modaps.eosdis.nasa.gov/archive/allData/61/MOD11C3/  
-Fire data of MODIS Fire_cci v5.1 can be downloaded from https://data.ceda.ac.uk/neodc/esacci/fire/data/burned_area/MODIS/pixel/v5.1/
-The data that are used in the code can be downloaded from https://zenodo.org/uploads/14831684
+* The consistent and corrected nighttime light (CCNL) dataset available as GeoTIFF format at https://zenodo.org/record/6644980
+* We used processed (cropped, outliers removed) annual ALAN data from https://github.com/PlekhanovaElena/ALAN_Arctic
+* Terra climate data of precipitation and VPD is available at Catalog http://thredds.northwestknowledge.net:8080/thredds/catalog/TERRACLIMATE_ALL/data/catalog.html
+* Land Surface Temperature data of MODIS 11C3 can be downloaded from https://ladsweb.modaps.eosdis.nasa.gov/archive/allData/61/MOD11C3/
+* Fire data of MODIS Fire_cci v5.1 can be downloaded from https://data.ceda.ac.uk/neodc/esacci/fire/data/burned_area/MODIS/pixel/v5.1/
+* Additional data for the current analysis can be downloaded from https://zenodo.org/uploads/14831684
 
 ### Code
 
