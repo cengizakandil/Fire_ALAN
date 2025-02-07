@@ -11,10 +11,15 @@ This repository contains the code for analysis and the accompanying figures in t
 
 ### Code
 
-Data Preparation folder includes the r codes for creating the cumulative ALAN datasets for each year and creating the centroids of the fire scars. Cumulative ALAN and Masked ALAN (showing only the lit area as 1 and unlit area as zero) are available at the above Zenodo depository.
-Analysis folder includes the example year of 2012 only. Due to computational requirements, we needed to calculate each year separately so the example code needed to be adjusted for each year, such as number of fires that year, cumulative ALAN mask, and separate climate variables of each year. Fire_distance file includes the code for calculation of distance of each fire centroid to the nearest ALAN. Climate-var file contains the code for calculating the climate variables of each fire scar. Control_distance file contains the code for sampling 1000 closest points in the Arctic with similar climate variables to fire scar, then randomly choosing 3 control points and finding their disatnces to the nearest lit area.
+**Data Preparation folder** includes the r codes for creating the cumulative ALAN datasets for each year and creating the centroids of the fire scars. 
+Cumulative ALAN has digital number (DN) values and Masked ALAN is binary: 1 for the lit area and 0 for unlit area. They are available at the Zenodo [depository](https://zenodo.org/uploads/14831684).
+
+**Analysis folder** includes the example year of 2012 only. 
+Due to computational requirements, we needed to calculate each year separately so the example code needed to be adjusted for each year, such as number of fires that year, cumulative ALAN mask, and separate climate variables of each year. Fire_distance file includes the code for calculation of distance of each fire centroid to the nearest ALAN. 
+Climate-var file contains the code for calculating the climate variables of each fire scar. Control_distance file contains the code for sampling 1000 closest points in the Arctic with similar climate variables to fire scar, then randomly choosing 3 control points and finding their disatnces to the nearest lit area.
 The data table with all the fire centroids, control points, and the distances to the nearest lit area are available at final data table.
-Figure folder includes the code to create the figure in the manuscript based on the above data table. 
+
+**Figure folder** includes the code to create the figure in the manuscript based on the above data table. 
 
 
 
