@@ -1,0 +1,109 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var geometry = 
+    /* color: #d63000 */
+    /* shown: false */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.Polygon(
+        [[[-151.62920803198006, 69.5357705001357],
+          [-151.62920803198006, 68.56169344957398],
+          [-149.38799709448006, 68.56169344957398],
+          [-149.38799709448006, 69.5357705001357]]], null, false),
+    imageVisParam = {"opacity":1,"bands":["BurnDate_count"],"min":2006,"max":2020,"palette":["0000ff"]},
+    table = ee.FeatureCollection("users/nrietze/vegetation_zones_wgs84"),
+    processing_tiles_unmasked = ee.FeatureCollection("projects/ee-nrietze/assets/processing_tiles_unmasked"),
+    table2 = ee.FeatureCollection("projects/ee-nrietze/assets/processing_tiles");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+// SECTION - Load, filter and mask Fire CCI burn area data
+// -------------------------------------------------------
+
+// Define years to process
+var listYears = [];
+for (var ii=2001; ii<=2020; ii++){
+  listYears.push(ii)
+}
+
+// Select pixels > 50 % confidence and convert to binary map
+var ba_CCI = ee.ImageCollection(listYears.map(function(yy){
+  var col = ee.ImageCollection("ESA/CCI/FireCCI/5_1")
+    .filter(ee.Filter.calendarRange(yy, yy, 'year')).map(function(im){
+     return im.updateMask(im.select('ConfidenceLevel').gt(50))
+      .copyProperties(im,['system:time_start'])
+    })
+  // Count up burned area through an entire year
+  var im = col.reduce(ee.Reducer.count())
+    .gt(0) // mask unburned pixels
+    .select('BurnDate_count')
+    .uint8() //.multiply(yy).subtract(1990).gt(0).uint8()
+return im.set('system:time_start',ee.Date.fromYMD(yy,1,1).millis())
+  .set('yy',yy)
+}))
+
+// Count up burned area through entire study period
+var ba_CCI_total = ba_CCI.reduce(ee.Reducer.count())
+  .gt(0) // mask unburned pixels
+  .select('BurnDate_count_count')
+  .uint8()
+
+// SECTION - Mask processing tiles
+// -------------------------------
+
+// Load raw processing tiles without burn area information
+// CAVM
+// var processing_tiles_unmasked = ee.FeatureCollection('projects/ee-nrietze/assets/processing_tiles_unmasked');
+
+// Arctic regions (Cengiz) - accidentally named 70N but extends to 75 °N
+var processing_tiles_unmasked = ee.FeatureCollection('projects/ee-nrietze/assets/regional_processing_tiles_below70N');
+
+// Calculate the sum of burn area pixels for each polygon in the feature layer
+var sumBurnedArea = ba_CCI_total.reduceRegions({
+  collection: processing_tiles_unmasked,
+  reducer: ee.Reducer.sum(),
+  scale: 249.9938659391174
+});
+
+
+// Reformat all polygons to 'Polygon', because some features somehow have Lines in them (messes up export)
+// following this:
+//  - https://gis.stackexchange.com/questions/394843/exporting-geometry-collection-as-shapefile-on-earth-engine
+//  - https://gis.stackexchange.com/questions/381996/is-it-possible-to-remove-select-geometries-from-geometrycollection-elements-with
+
+// assign geometry_type as field
+var sumBurnedArea_edited = sumBurnedArea.map(function (f) { 
+      return ee.Feature(f).set('geometry_type', ee.Feature(f).geometry().type()); })
+
+var geoCollection = sumBurnedArea_edited.filter(ee.Filter.equals('geometry_type', 'GeometryCollection'));
+var MultiPolygons = sumBurnedArea_edited.filter(ee.Filter.equals('geometry_type', 'MultiPolygon'))
+var polygons = sumBurnedArea_edited.filter(ee.Filter.equals('geometry_type', 'Polygon'))
+
+// Delete all LineStrings by only merging Polygons in GeometryCollection to MultiPolygon
+var featPolygons = geoCollection.map(function (feature) {
+  var filteredGeoms = feature
+    .geometry()
+    .geometries()
+    // "Filter" out only Polygons
+    .map(function (geometry) {
+      geometry = ee.Geometry(geometry);
+      // Test is reversed because we don't have a simple "equals" and compareTo returns 0 for equal.
+      return ee.Algorithms.If(geometry.type().compareTo('Polygon'), null, geometry);
+    }, /* dropNulls= */ true);
+  return feature
+    .setGeometry(ee.Geometry.MultiPolygon(filteredGeoms))
+});
+
+print('Cleaned GeometryCollection:',featPolygons);
+
+var finalCollection = polygons.merge(featPolygons).merge(MultiPolygons)
+
+print('Output features:',finalCollection);
+
+// Export results to shapefile
+Export.table.toDrive({
+  collection: finalCollection,
+  description: 'regional_processing_tiles_masked',
+  folder: 'ArcticFires',
+  fileFormat: 'SHP'
+});
