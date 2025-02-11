@@ -49,5 +49,6 @@ fig2a <- plot1 + scale_color_manual(values=c("#8B635C", "cornflowerblue")) +
   )
 
 plot(fig2a)
+# this comment
 
 
