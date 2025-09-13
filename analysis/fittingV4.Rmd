@@ -1,0 +1,163 @@
+---
+title: "Fitting mixtures"
+author: "R Furrer"
+date: '2024-07-08'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+*Gereral Remarks*
+Although this script is based on the previous versions exchanged, I have trimmed the code down to the necessary steps.  
+Note that the file structure changed again compared to the previous files!
+
+## EDA
+
+Loading data, numerical EDA (subset). 
+
+```{r load}
+dat <- read.csv("final_table_with_rounded_values.csv", header=TRUE, row.names=1, sep=",")
+head(dat)        # nothing to eliminate
+dim(dat)
+summary(dat)
+sum(is.na(dat))  # no NAs
+head(unique(sort(dat$Distance)))
+mD <- max(dat$Distance)
+```
+
+Due to rounding, we need to choose careful binning (i.e., bins with breakpoints). 
+The number of bins in the following histograms are a bit high, but it shows some relevant aspects!
+
+```{r}
+table(dat$fire_occurence)
+table(dat$fire_occurence)*c(1,3)  # exact 3:1 
+dfire0 <- dat$Distance[dat$fire_occurence==1]
+dcont0 <- dat$Distance[dat$fire_occurence!=1]
+par(mfrow=c(1,2))
+hist(dfire0, breaks = c(-.1,seq(0, to=mD, by=2)+.1))
+hist(dcont0, breaks = c(-.1,seq(0, to=mD, by=2)+.1))
+```
+
+There is actually a proportion of data points with distance exactly zero. We separate between exactly distance zero and strictly larger than zero. In probability terms, this is a mixing of a discrete and continues random component. To get started, we look at the proportions equal zero and larger than 100 km.
+
+
+```{r}
+zeroCount <- cbind(Fire=sum(dfire0==0), Control=sum(dcont0==0))
+zeroProp <- cbind(Fire=mean(dfire0==0), Control=mean(dcont0==0))
+print( zeroProp)
+dfire <- dfire0[dfire0>0]
+dcont <- dcont0[dcont0>0]
+par(mfrow=c(1,2))
+hist(dfire, breaks = c(seq(0, to=mD, by=4)+.1))
+hist(dcont, breaks = c(seq(0, to=mD, by=4)+.1))
+```
+
+
+## Proportion of zeros
+
+The proportion of zeros are significantly different. We have a formal test, comparing both proportions. Confidence interval is also given (The huge difference confirms that this is independent of the number of controls in the sample.) 
+
+```{r}
+zeroProp
+prop.test(c(zeroCount), c(length(dfire0),length(dcont0)))
+```
+
+## Fitting (individual models)
+
+Lets fit a Weibull and Gamma to see which of the two is better. Only tiny difference and hence we pick Gamma for better numerical stability. 
+```{r}
+
+library(MASS)
+(aW <- fitdistr(dfire, densfun="Weibull", lower=c(.01,.001)))
+(bW <- fitdistr(dcont, densfun="Weibull", lower=c(.01,.001)))
+(aG <- fitdistr(dfire, densfun="gamma", lower=c(.01,.001)))
+(bG <- fitdistr(dcont, densfun="gamma", lower=c(.01,.001)))
+
+c(FireGamma=aG$loglik,  ControlGamma=bG$loglik, FireWeibul=aW$loglik,  ControlWeibul=bW$loglik)
+(c(FireGamma=aG$loglik,  ControlGamma=bG$loglik)- c(FireWeibul=aW$loglik,  ControlWeibul=bW$loglik))
+```
+
+We also show the histograms with superimposed fits (fire read, control blue, lines correspond to the fit, e.g., dark red line fits the redish histogram of the fire distances).
+
+```{r}
+
+library(MASS)
+(a <- fitdistr(dfire, densfun="gamma", lower=c(.01,.001)))
+(b <- fitdistr(dcont, densfun="gamma", lower=c(.01,.001)))
+
+
+br <- seq(0, to=mD+10, by=10)
+
+par(mfrow=c(1,2))
+hist(dfire, breaks = br, prob=TRUE, col=rgb(1,0,0,.25))
+curve(dgamma(x,shape=a$estimate[1],rate=a$estimate[2]),to=mD, add=TRUE, lwd=2, col=2)
+curve(dgamma(x,shape=b$estimate[1],rate=b$estimate[2]),to=mD, add=TRUE, lwd=2, col=4)
+hist(dcont, breaks = br, prob=TRUE, col=rgb(0,0,1,.25))
+curve(dgamma(x,shape=a$estimate[1],rate=a$estimate[2]),to=mD, add=TRUE, lwd=2, col=2)
+curve(dgamma(x,shape=b$estimate[1],rate=b$estimate[2]),to=mD, add=TRUE, lwd=2, col=4)
+
+
+```
+
+
+We can also plot the relative log-likelihood for both settings (in one single panel). The dot represents the estimates. Note that the contour line (iso-line) of value -3 gives the approximate 95\% Confidence region of the joint estimate $\hat\theta=$ (shape,rate). The estimates are significantly different. 
+
+
+```{r}
+loglik <- function(theta, x) {
+  sum(dgamma(x, theta[1], theta[2], log=TRUE))
+}
+
+shape <- seq(.9, 1.08, l=30)
+rate <- seq(0.015, 0.022, l=41)
+
+grid <- expand.grid(shape, rate)
+tmp <- apply(grid, 1, loglik, x=dfire)
+likMatrixfire <- matrix(tmp-max(tmp), length(shape), length(rate))
+
+tmp <- apply(grid, 1, loglik, x=dcont)
+likMatrixcont <- matrix(tmp-max(tmp), length(shape), length(rate))
+
+contour(shape, rate, likMatrixfire, levels = 0:-5, xlab = "shape a", ylab = "rate b", col=2)
+contour(shape, rate, likMatrixcont, levels = 0:-5, add=TRUE, col=4)
+points(a$estimate[1], a$estimate[2], col=2, cex=2, pch=20)
+points(b$estimate[1], b$estimate[2], col=4, cex=2, pch=20)
+```
+
+
+
+## Fitting mixture distributions
+
+Old data suggested that there might be two regimes. The current histograms  are not conclusive. We nevertheless try if we can fit a mixture distribution.
+We try a manual implementation of fitting (since last fit). Explored many different initial values and we did not succeed: we did not decrease the loglikelihood sufficiently to justify three additional parameters.  
+
+```{r}
+loglikMix <- function(theta, x) {
+  sum( theta[5]*dgamma(x, theta[1], rate=theta[2], log=TRUE) + 
+         (1-theta[5])*dgamma(x, theta[3], rate=theta[4], log=TRUE) )
+}
+
+# for fire initial values inspired by
+#fitdistr(dfire[dfire>100],"gamma")
+#fitdistr(dfire[dfire<100],"gamma")
+
+(res <- optim(c(.8,0.01,1,.1,.8), loglikMix, x=dfire,
+              # works but no improvement:
+#  method="L-BFGS-B", lower=c(.1,.001,.95,.001,0.5), upper=c(2,.2,2,.2,0.99), 
+  method="L-BFGS-B", lower=c(.9,.01,1,.1,0.5), upper=c(2,.04,30,.2,0.999),
+               control=list(fnrate=-1), hessian = FALSE))
+(c(a$estimate, a$loglik))
+
+(res <- optim(c(.8,0.01,1,.1,.8), loglikMix, x=dcont,
+              # works but no improvement:
+#  method="L-BFGS-B", lower=c(.1,.001,.95,.001,0.5), upper=c(2,.2,2,.2,0.99), 
+  method="L-BFGS-B", lower=c(.9,.01,1,.02,0.5), upper=c(2,.04,30,.2,0.99),
+               control=list(fnrate=-1), hessian = FALSE))
+(c(b$estimate, b$loglik))
+
+
+```
+
+  
